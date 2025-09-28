@@ -1,0 +1,10 @@
+## Interface: 30300
+## Title: SimpleAlert
+## Notes: Addon simples de alerta usando Ace3
+## Author: Khufos
+## Version: 1.0
+## SavedVariables: SimpleAlertDB
+## OptionalDeps: LibStub, CallbackHandler-1.0, Ace3
+
+libs\embeds.xml
+core.lua
