@@ -4,6 +4,7 @@ local SimpleAlert = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceConsole-3.0"
 local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local AceDB = LibStub("AceDB-3.0")
+local AceDBOptions = LibStub("AceDBOptions-3.0")
 
 -- Feitiços que queremos alertar ao iniciar cast
 local trackedSpells = {
@@ -178,12 +179,14 @@ local defaults = {
 }
 
 local function getToggle(info)
-    local category, key = unpack(info)
+    local category = info[1]
+    local key = info[#info]
     return SimpleAlert.db.profile[category][key]
 end
 
 local function setToggle(info, value)
-    local category, key = unpack(info)
+    local category = info[1]
+    local key = info[#info]
     SimpleAlert.db.profile[category][key] = value
 end
 
@@ -271,6 +274,8 @@ function SimpleAlert:OnInitialize()
             set = function(info, val) self.db.profile.debuffs[spellId] = val end,
         }
     end
+
+    options.args.profiles = AceDBOptions:GetOptionsTable(self.db)
 
     AceConfig:RegisterOptionsTable(addonName, options)
     AceConfigDialog:AddToBlizOptions(addonName, addonName)
