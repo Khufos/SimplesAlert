@@ -1,7 +1,9 @@
--- FearAlertSimple Addon
-local addonName = "FearAlertSimple"
-local f = CreateFrame("Frame")
-f.lastAlertTimes = {}
+local addonName, addon = ...
+
+local SimpleAlert = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceConsole-3.0", "AceEvent-3.0")
+local AceConfig = LibStub("AceConfig-3.0")
+local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+local AceDB = LibStub("AceDB-3.0")
 
 -- Feitiços que queremos alertar ao iniciar cast
 local trackedSpells = {
@@ -14,278 +16,314 @@ local trackedSpells = {
 -- DoTs que queremos alertar ao aplicar ou remover
 local trackedDots = {
     ["Flame Shock"] = true,
-    -- outros DoTs
-    ["Mortal Strike"] = true,       -- Shadow Prison (Shadowprison)
+    ["Mortal Strike"] = true,
 }
 
 -- Debuffs que queremos rastrear quando recebidos
+-- Organizado por [spellID] = {name = "Spell Name", class = "CLASS"}
 local trackedDebuffs = {
    -- Death Knight
-[47481] = "Gnaw",                    -- Gnaw (Ghoul)
-[51209] = "Hungering Cold",          -- Hungering Cold
-[47476] = "Strangulate",             -- Strangulate
-[45524] = "Chains of Ice",           -- Chains of Ice
-[55666] = "Desecration",             -- Desecration
-[58617] = "Glyph of Heart Strike",   -- Glyph of Heart Strike
-[50436] = "Icy Clutch",              -- Icy Clutch (Chilblains)
-
--- Druid
-[5211]  = "Bash",                    -- Bash
-[33786] = "Cyclone",                 -- Cyclone
-[2637]  = "Hibernate",               -- Hibernate
-[22570] = "Maim",                    -- Maim
-[9005]  = "Pounce",                  -- Pounce
-[339]   = "Entangling Roots",        -- Entangling Roots
-[19675] = "Feral Charge Effect",     -- Feral Charge Effect
-[58179] = "Infected Wounds",         -- Infected Wounds
-[61391] = "Typhoon",                 -- Typhoon
-
--- Hunter
-[60210] = "Freezing Arrow",          -- Freezing Arrow Effect
-[3355]  = "Freezing Trap",           -- Freezing Trap Effect
-[24394] = "Intimidation",            -- Intimidation
-[1513]  = "Scare Beast",             -- Scare Beast
-[19503] = "Scatter Shot",            -- Scatter Shot
-[19386] = "Wyvern Sting",            -- Wyvern Sting
-[34490] = "Silencing Shot",          -- Silencing Shot
-[53359] = "Chimera Shot - Scorpid",  -- Chimera Shot - Scorpid
-[19306] = "Counterattack",           -- Counterattack
-[19185] = "Entrapment",              -- Entrapment
-[35101] = "Concussive Barrage",      -- Concussive Barrage
-[5116]  = "Concussive Shot",         -- Concussive Shot
-[13810] = "Frost Trap Aura",         -- Frost Trap Aura
-[61394] = "Glyph of Freezing Trap",  -- Glyph of Freezing Trap
-[2974]  = "Wing Clip",               -- Wing Clip
-
--- Hunter Pets
-[50519] = "Sonic Blast",             -- Sonic Blast (Bat)
-[50541] = "Snatch",                  -- Snatch (Bird of Prey)
-[54644] = "Froststorm Breath",       -- Froststorm Breath (Chimera)
-[50245] = "Pin",                     -- Pin (Crab)
-[50271] = "Tendon Rip",              -- Tendon Rip (Hyena)
-[50518] = "Ravage",                  -- Ravage (Ravager)
-[54706] = "Venom Web Spray",         -- Venom Web Spray (Silithid)
-[4167]  = "Web",                     -- Web (Spider)
-
--- Mage
-[44572] = "Deep Freeze",             -- Deep Freeze
-[31661] = "Dragon's Breath",         -- Dragon's Breath
-[12355] = "Impact",                  -- Impact
-[118]   = "Polymorph",               -- Polymorph
-[18469] = "Silenced - Improved Counterspell", -- Silenced - Improved Counterspell
-[64346] = "Fiery Payback",           -- Fiery Payback
-[33395] = "Freeze",                  -- Freeze (Water Elemental)
-[122]   = "Frost Nova",              -- Frost Nova
-[11071] = "Frostbite",               -- Frostbite
-[55080] = "Shattered Barrier",       -- Shattered Barrier
-[11113] = "Blast Wave",              -- Blast Wave
-[6136]  = "Chilled",                 -- Chilled
-[120]   = "Cone of Cold",            -- Cone of Cold
-[116]   = "Frostbolt",               -- Frostbolt
-[47610] = "Frostfire Bolt",          -- Frostfire Bolt
-[31589] = "Slow",                    -- Slow
-
--- Paladin
-[853]   = "Hammer of Justice",       -- Hammer of Justice
-[2812]  = "Holy Wrath",              -- Holy Wrath
-[20066] = "Repentance",              -- Repentance
-[20170] = "Stun (Seal of Justice)",  -- Stun (Seal of Justice proc)
-[10326] = "Turn Evil",               -- Turn Evil
-[63529] = "Shield of the Templar",   -- Shield of the Templar
-[20184] = "Judgement of Justice",    -- Judgement of Justice
-
--- Priest
-[605]   = "Mind Control",            -- Mind Control
-[64044] = "Psychic Horror",          -- Psychic Horror
-[8122]  = "Psychic Scream",          -- Psychic Scream
-[9484]  = "Shackle Undead",          -- Shackle Undead
-[15487] = "Silence",                 -- Silence
-[15407] = "Mind Flay",               -- Mind Flay
-
--- Rogue
-[2094]  = "Blind",                   -- Blind
-[1833]  = "Cheap Shot",              -- Cheap Shot
-[1776]  = "Gouge",                   -- Gouge
-[408]   = "Kidney Shot",             -- Kidney Shot
-[6770]  = "Sap",                     -- Sap
-[1330]  = "Garrote - Silence",       -- Garrote - Silence
-[18425] = "Silenced - Improved Kick",-- Silenced - Improved Kick
-[51722] = "Dismantle",               -- Dismantle
-[31125] = "Blade Twisting",          -- Blade Twisting
-[3409]  = "Crippling Poison",        -- Crippling Poison
-[26679] = "Deadly Throw",            -- Deadly Throw
-
--- Shaman
-[39796] = "Stoneclaw Stun",          -- Stoneclaw Stun
-[51514] = "Hex",                     -- Hex
-[64695] = "Earthgrab",               -- Earthgrab
-[63685] = "Freeze (Frozen Power)",   -- Freeze (Frozen Power)
-[3600]  = "Earthbind",               -- Earthbind
-[8056]  = "Frost Shock",             -- Frost Shock
-[8034]  = "Frostbrand Attack",       -- Frostbrand Attack
-
--- Warlock
-[710]   = "Banish",                  -- Banish
-[6789]  = "Death Coil",              -- Death Coil
-[5782]  = "Fear",                    -- Fear
-[5484]  = "Howl of Terror",          -- Howl of Terror
-[6358]  = "Seduction",               -- Seduction
-[30283] = "Shadowfury",              -- Shadowfury
-[24259] = "Spell Lock",              -- Spell Lock
-[18118] = "Aftermath",               -- Aftermath
-[18223] = "Curse of Exhaustion",     -- Curse of Exhaustion
-
--- Warrior
-[7922]  = "Charge Stun",             -- Charge Stun
-[12809] = "Concussion Blow",         -- Concussion Blow
-[20253] = "Intercept",               -- Intercept
-[5246]  = "Intimidating Shout",      -- Intimidating Shout
-[12798] = "Revenge Stun",            -- Revenge Stun
-[46968] = "Shockwave",               -- Shockwave
-[18498] = "Silenced - Gag Order",    -- Silenced - Gag Order
-[676]   = "Disarm",                  -- Disarm
-[58373] = "Glyph of Hamstring",      -- Glyph of Hamstring
-[23694] = "Improved Hamstring",      -- Improved Hamstring
-[1715]  = "Hamstring",               -- Hamstring
-[12323] = "Piercing Howl",
-           -- Piercing Howl
-
--- Other
-[30217] = "Adamantite Grenade",      -- Adamantite Grenade
-[67769] = "Cobalt Frag Bomb",        -- Cobalt Frag Bomb
-[30216] = "Fel Iron Bomb",           -- Fel Iron Bomb
-[20549] = "War Stomp",               -- War Stomp
-[25046] = "Arcane Torrent",          -- Arcane Torrent
-[39965] = "Frost Grenade",           -- Frost Grenade
-[55536] = "Frostweave Net",          -- Frostweave Net
-[13099] = "Net-o-Matic",             -- Net-o-Matic
-[29703] = "Dazed",                   -- Dazed
-
--- Immunities
-[46924] = "Bladestorm",              -- Bladestorm (Warrior)
-[642]   = "Divine Shield",           -- Divine Shield (Paladin)
-[45438] = "Ice Block",               -- Ice Block (Mage)
-[34692] = "The Beast Within",        -- The Beast Within (Hunter)
-
--- PvE
-[28169] = "Mutating Injection",      -- Mutating Injection (Grobbulus)
-[28059] = "Positive Charge",         -- Positive Charge (Thaddius)
-[28084] = "Negative Charge",         -- Negative Charge (Thaddius)
-[27819] = "Detonate Mana",           -- Detonate Mana (Kel'Thuzad)
-[63024] = "Gravity Bomb",            -- Gravity Bomb (XT-002 Deconstructor)
-[63018] = "Light Bomb",              -- Light Bomb (XT-002 Deconstructor)
-[62589] = "Nature's Fury",           -- Nature's Fury (Freya)
-[63276] = "Mark of the Faceless",    -- Mark of the Faceless (General Vezax)
-[66770] = "Ferocious Butt",          -- Ferocious Butt (Icehowl)
-[5416]  = "SCOPIAN",          -- Leeching Swarm (Anub'arak)
-[47486] = "Mortal Striker",           -- Shadow Prison (Shadowprison)
-    -- outros debuffs
+    [47481] = { name = "Gnaw", class = "DEATHKNIGHT" },
+    [51209] = { name = "Hungering Cold", class = "DEATHKNIGHT" },
+    [47476] = { name = "Strangulate", class = "DEATHKNIGHT" },
+    [45524] = { name = "Chains of Ice", class = "DEATHKNIGHT" },
+    [55666] = { name = "Desecration", class = "DEATHKNIGHT" },
+    [58617] = { name = "Glyph of Heart Strike", class = "DEATHKNIGHT" },
+    [50436] = { name = "Icy Clutch", class = "DEATHKNIGHT" },
+    -- Druid
+    [5211]  = { name = "Bash", class = "DRUID" },
+    [33786] = { name = "Cyclone", class = "DRUID" },
+    [2637]  = { name = "Hibernate", class = "DRUID" },
+    [22570] = { name = "Maim", class = "DRUID" },
+    [9005]  = { name = "Pounce", class = "DRUID" },
+    [339]   = { name = "Entangling Roots", class = "DRUID" },
+    [19675] = { name = "Feral Charge Effect", class = "DRUID" },
+    [58179] = { name = "Infected Wounds", class = "DRUID" },
+    [61391] = { name = "Typhoon", class = "DRUID" },
+    -- Hunter
+    [60210] = { name = "Freezing Arrow", class = "HUNTER" },
+    [3355]  = { name = "Freezing Trap", class = "HUNTER" },
+    [24394] = { name = "Intimidation", class = "HUNTER" },
+    [1513]  = { name = "Scare Beast", class = "HUNTER" },
+    [19503] = { name = "Scatter Shot", class = "HUNTER" },
+    [19386] = { name = "Wyvern Sting", class = "HUNTER" },
+    [34490] = { name = "Silencing Shot", class = "HUNTER" },
+    [53359] = { name = "Chimera Shot - Scorpid", class = "HUNTER" },
+    [19306] = { name = "Counterattack", class = "HUNTER" },
+    [19185] = { name = "Entrapment", class = "HUNTER" },
+    [35101] = { name = "Concussive Barrage", class = "HUNTER" },
+    [5116]  = { name = "Concussive Shot", class = "HUNTER" },
+    [13810] = { name = "Frost Trap Aura", class = "HUNTER" },
+    [61394] = { name = "Glyph of Freezing Trap", class = "HUNTER" },
+    [2974]  = { name = "Wing Clip", class = "HUNTER" },
+    -- Hunter Pets
+    [50519] = { name = "Sonic Blast (Bat)", class = "HUNTER" },
+    [50541] = { name = "Snatch (Bird of Prey)", class = "HUNTER" },
+    [54644] = { name = "Froststorm Breath (Chimera)", class = "HUNTER" },
+    [50245] = { name = "Pin (Crab)", class = "HUNTER" },
+    [50271] = { name = "Tendon Rip (Hyena)", class = "HUNTER" },
+    [50518] = { name = "Ravage (Ravager)", class = "HUNTER" },
+    [54706] = { name = "Venom Web Spray (Silithid)", class = "HUNTER" },
+    [4167]  = { name = "Web (Spider)", class = "HUNTER" },
+    -- Mage
+    [44572] = { name = "Deep Freeze", class = "MAGE" },
+    [31661] = { name = "Dragon's Breath", class = "MAGE" },
+    [12355] = { name = "Impact", class = "MAGE" },
+    [118]   = { name = "Polymorph", class = "MAGE" },
+    [18469] = { name = "Silenced - Improved Counterspell", class = "MAGE" },
+    [64346] = { name = "Fiery Payback", class = "MAGE" },
+    [33395] = { name = "Freeze (Water Elemental)", class = "MAGE" },
+    [122]   = { name = "Frost Nova", class = "MAGE" },
+    [11071] = { name = "Frostbite", class = "MAGE" },
+    [55080] = { name = "Shattered Barrier", class = "MAGE" },
+    [11113] = { name = "Blast Wave", class = "MAGE" },
+    [6136]  = { name = "Chilled", class = "MAGE" },
+    [120]   = { name = "Cone of Cold", class = "MAGE" },
+    [116]   = { name = "Frostbolt", class = "MAGE" },
+    [47610] = { name = "Frostfire Bolt", class = "MAGE" },
+    [31589] = { name = "Slow", class = "MAGE" },
+    -- Paladin
+    [853]   = { name = "Hammer of Justice", class = "PALADIN" },
+    [2812]  = { name = "Holy Wrath", class = "PALADIN" },
+    [20066] = { name = "Repentance", class = "PALADIN" },
+    [20170] = { name = "Stun (Seal of Justice)", class = "PALADIN" },
+    [10326] = { name = "Turn Evil", class = "PALADIN" },
+    [63529] = { name = "Shield of the Templar", class = "PALADIN" },
+    [20184] = { name = "Judgement of Justice", class = "PALADIN" },
+    -- Priest
+    [605]   = { name = "Mind Control", class = "PRIEST" },
+    [64044] = { name = "Psychic Horror", class = "PRIEST" },
+    [8122]  = { name = "Psychic Scream", class = "PRIEST" },
+    [9484]  = { name = "Shackle Undead", class = "PRIEST" },
+    [15487] = { name = "Silence", class = "PRIEST" },
+    [15407] = { name = "Mind Flay", class = "PRIEST" },
+    -- Rogue
+    [2094]  = { name = "Blind", class = "ROGUE" },
+    [1833]  = { name = "Cheap Shot", class = "ROGUE" },
+    [1776]  = { name = "Gouge", class = "ROGUE" },
+    [408]   = { name = "Kidney Shot", class = "ROGUE" },
+    [6770]  = { name = "Sap", class = "ROGUE" },
+    [1330]  = { name = "Garrote - Silence", class = "ROGUE" },
+    [18425] = { name = "Silenced - Improved Kick", class = "ROGUE" },
+    [51722] = { name = "Dismantle", class = "ROGUE" },
+    [31125] = { name = "Blade Twisting", class = "ROGUE" },
+    [3409]  = { name = "Crippling Poison", class = "ROGUE" },
+    [26679] = { name = "Deadly Throw", class = "ROGUE" },
+    -- Shaman
+    [39796] = { name = "Stoneclaw Stun", class = "SHAMAN" },
+    [51514] = { name = "Hex", class = "SHAMAN" },
+    [64695] = { name = "Earthgrab", class = "SHAMAN" },
+    [63685] = { name = "Freeze (Frozen Power)", class = "SHAMAN" },
+    [3600]  = { name = "Earthbind", class = "SHAMAN" },
+    [8056]  = { name = "Frost Shock", class = "SHAMAN" },
+    [8034]  = { name = "Frostbrand Attack", class = "SHAMAN" },
+    -- Warlock
+    [710]   = { name = "Banish", class = "WARLOCK" },
+    [6789]  = { name = "Death Coil", class = "WARLOCK" },
+    [5782]  = { name = "Fear", class = "WARLOCK" },
+    [5484]  = { name = "Howl of Terror", class = "WARLOCK" },
+    [6358]  = { name = "Seduction", class = "WARLOCK" },
+    [30283] = { name = "Shadowfury", class = "WARLOCK" },
+    [24259] = { name = "Spell Lock", class = "WARLOCK" },
+    [18118] = { name = "Aftermath", class = "WARLOCK" },
+    [18223] = { name = "Curse of Exhaustion", class = "WARLOCK" },
+    -- Warrior
+    [7922]  = { name = "Charge Stun", class = "WARRIOR" },
+    [12809] = { name = "Concussion Blow", class = "WARRIOR" },
+    [20253] = { name = "Intercept", class = "WARRIOR" },
+    [5246]  = { name = "Intimidating Shout", class = "WARRIOR" },
+    [12798] = { name = "Revenge Stun", class = "WARRIOR" },
+    [46968] = { name = "Shockwave", class = "WARRIOR" },
+    [18498] = { name = "Silenced - Gag Order", class = "WARRIOR" },
+    [676]   = { name = "Disarm", class = "WARRIOR" },
+    [58373] = { name = "Glyph of Hamstring", class = "WARRIOR" },
+    [23694] = { name = "Improved Hamstring", class = "WARRIOR" },
+    [1715]  = { name = "Hamstring", class = "WARRIOR" },
+    [12323] = { name = "Piercing Howl", class = "WARRIOR" },
+    -- Other
+    [30217] = { name = "Adamantite Grenade", class = "OTHER" },
+    [67769] = { name = "Cobalt Frag Bomb", class = "OTHER" },
+    [30216] = { name = "Fel Iron Bomb", class = "OTHER" },
+    [20549] = { name = "War Stomp", class = "OTHER" },
+    [25046] = { name = "Arcane Torrent", class = "OTHER" },
+    [39965] = { name = "Frost Grenade", class = "OTHER" },
+    [55536] = { name = "Frostweave Net", class = "OTHER" },
+    [13099] = { name = "Net-o-Matic", class = "OTHER" },
+    [29703] = { name = "Dazed", class = "OTHER" },
+    -- Immunities
+    [46924] = { name = "Bladestorm", class = "IMMUNITY" },
+    [642]   = { name = "Divine Shield", class = "IMMUNITY" },
+    [45438] = { name = "Ice Block", class = "IMMUNITY" },
+    [34692] = { name = "The Beast Within", class = "IMMUNITY" },
+    -- PvE
+    [28169] = { name = "Mutating Injection", class = "PVE" },
+    [28059] = { name = "Positive Charge", class = "PVE" },
+    [28084] = { name = "Negative Charge", class = "PVE" },
+    [27819] = { name = "Detonate Mana", class = "PVE" },
+    [63024] = { name = "Gravity Bomb", class = "PVE" },
+    [63018] = { name = "Light Bomb", class = "PVE" },
+    [62589] = { name = "Nature's Fury", class = "PVE" },
+    [63276] = { name = "Mark of the Faceless", class = "PVE" },
+    [66770] = { name = "Ferocious Butt", class = "PVE" },
+    [5416]  = { name = "Leeching Swarm", class = "PVE" },
+    [47486] = { name = "Mortal Striker", class = "PVE" },
 }
 
--- Função genérica para enviar alertas com controle de spam
-local function SendAlert(key, message, cooldown)
-    local now = GetTime()
+local defaults = {
+    profile = {
+        spells = {},
+        dots = {},
+        debuffs = {},
+    }
+}
+
+local function getToggle(info)
+    local category, key = unpack(info)
+    return SimpleAlert.db.profile[category][key]
+end
+
+local function setToggle(info, value)
+    local category, key = unpack(info)
+    SimpleAlert.db.profile[category][key] = value
+end
+
+function SimpleAlert:OnInitialize()
+    -- Populando os defaults
+    for spellName in pairs(trackedSpells) do
+        defaults.profile.spells[spellName] = true
+    end
+    for dotName in pairs(trackedDots) do
+        defaults.profile.dots[dotName] = true
+    end
+    for spellId in pairs(trackedDebuffs) do
+        defaults.profile.debuffs[spellId] = true
+    end
+
+    self.db = AceDB:New("SimpleAlertDB", defaults, true)
+    self:RegisterChatCommand("sa", "ChatCommand")
+    self:RegisterChatCommand("simplealert", "ChatCommand")
+
+    local options = {
+        name = addonName,
+        handler = self,
+        type = "group",
+        args = {
+            spells = {
+                type = "group",
+                name = "Casts Inimigos",
+                args = {},
+            },
+            dots = {
+                type = "group",
+                name = "Seus DoTs",
+                args = {},
+            },
+            debuffs = {
+                type = "group",
+                name = "Debuffs Recebidos",
+                args = {},
+            },
+        },
+    }
+
+    -- Populando as opções dinamicamente
+    for spellName in pairs(trackedSpells) do
+        options.args.spells.args[spellName] = {
+            type = "toggle",
+            name = spellName,
+            desc = "Ativar/desativar alerta para " .. spellName,
+            get = getToggle,
+            set = setToggle,
+        }
+    end
+
+    for dotName in pairs(trackedDots) do
+        options.args.dots.args[dotName] = {
+            type = "toggle",
+            name = dotName,
+            desc = "Ativar/desativar alerta para " .. dotName,
+            get = getToggle,
+            set = setToggle,
+        }
+    end
+
+    local customCategoryNames = {
+        OTHER = "Outros",
+        IMMUNITY = "Imunidades",
+        PVE = "PvE",
+    }
+
+    for spellId, data in pairs(trackedDebuffs) do
+        local class = data.class
+        if not options.args.debuffs.args[class] then
+            local groupName = customCategoryNames[class] or LOCALIZED_CLASS_NAMES_MALE[class]
+            options.args.debuffs.args[class] = {
+                type = "group",
+                name = groupName,
+                args = {},
+            }
+        end
+        options.args.debuffs.args[class].args[tostring(spellId)] = {
+            type = "toggle",
+            name = data.name,
+            desc = "Ativar/desativar alerta para " .. data.name,
+            get = function(info) return self.db.profile.debuffs[spellId] end,
+            set = function(info, val) self.db.profile.debuffs[spellId] = val end,
+        }
+    end
+
+    AceConfig:RegisterOptionsTable(addonName, options)
+    AceConfigDialog:AddToBlizOptions(addonName, addonName)
+
+    self:Print("Carregado! Use /sa para configurar.")
+end
+
+function SimpleAlert:OnEnable()
+    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+end
+
+function SimpleAlert:ChatCommand(input)
+    if not input or input:trim() == "" then
+        AceConfigDialog:Open(addonName)
+    end
+end
+
+function SimpleAlert:SendAlert(key, message, cooldown)
     cooldown = cooldown or 5
-    if not f.lastAlertTimes[key] or (now - f.lastAlertTimes[key]) > cooldown then
+    if not self.lastAlertTimes then self.lastAlertTimes = {} end
+    local now = GetTime()
+    if not self.lastAlertTimes[key] or (now - self.lastAlertTimes[key]) > cooldown then
         SendChatMessage(message, "PARTY")
-        f.lastAlertTimes[key] = now
+        self.lastAlertTimes[key] = now
     end
 end
 
--- Evento principal
-f:SetScript("OnEvent", function(self, event, ...)
-    if event == "PLAYER_LOGIN" then
-        self:OnPlayerLogin()
-    elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        self:HandleCombatLog(...)
-    end
-end)
+function SimpleAlert:COMBAT_LOG_EVENT_UNFILTERED(...)
+    local _, eventType, _, sourceName, _, _, destName, _, spellId, spellName = select(1, ...)
+    local sourceGUID, destGUID = select(3, ...), select(7, ...)
 
--- Mensagem de boas-vindas
-function f:OnPlayerLogin()
-    DEFAULT_CHAT_FRAME:AddMessage(addonName .. " carregado!")
-end
-
--- Lógica de combate
-function f:HandleCombatLog(...)
-    local _, eventType, sourceGUID, sourceName, _, destGUID, destName, _, spellId, spellName = select(1, ...)
-
-    -- Eventos que você causou
     if sourceGUID == UnitGUID("player") then
-        if eventType == "SPELL_CAST_START" then
-            self:HandleSpellCastStart(spellName)
-        elseif eventType == "SPELL_AURA_APPLIED" then
-            self:HandleDotApplied(spellName, destName, destGUID)
-        elseif eventType == "SPELL_AURA_REMOVED" then
-            self:HandleDotRemoved(spellName, destName, destGUID)
+        if eventType == "SPELL_CAST_START" and self.db.profile.spells[spellName] and trackedSpells[spellName] then
+            local targetName = UnitName("target") or "???"
+            self:SendAlert("cast_" .. spellName, spellName .. " sendo conjurado em " .. targetName .. "!")
+        elseif eventType == "SPELL_AURA_APPLIED" and self.db.profile.dots[spellName] and trackedDots[spellName] then
+            self:SendAlert("dot_" .. spellName .. "_" .. destGUID, spellName .. " aplicado em " .. (destName or "???") .. "!")
+        elseif eventType == "SPELL_AURA_REMOVED" and self.db.profile.dots[spellName] and trackedDots[spellName] then
+            self:SendAlert("remove_" .. spellName .. "_" .. destGUID, spellName .. " REMOVIDO de " .. (destName or "???") .. "!")
         end
     end
 
-    -- Eventos que você sofreu
     if destGUID == UnitGUID("player") then
-        if eventType == "SPELL_CAST_SUCCESS" then
-            self:HandleDebuffApplied(spellId, spellName, sourceName)
-        elseif eventType == "SPELL_AURA_REMOVED" then
-            self:HandleDebuffRemoved(spellId, spellName, sourceName)
+        if eventType == "SPELL_AURA_APPLIED" and self.db.profile.debuffs[spellId] and trackedDebuffs[spellId] then
+            local debuffName = trackedDebuffs[spellId].name
+            if debuffName == "Mortal Strike" then
+                self:SendAlert("debuff_" .. spellId, " Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "! Cura reduzida em 50%!")
+            else
+                self:SendAlert("debuff_" .. spellId, "Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "!")
+            end
+        elseif eventType == "SPELL_AURA_REMOVED" and self.db.profile.debuffs[spellId] and trackedDebuffs[spellId] then
+            local debuffName = trackedDebuffs[spellId].name
+            self:SendAlert("debuff_off_" .. spellId, debuffName .. " FINALIZADO! (Aplicado por " .. (sourceName or "???") .. ")")
         end
     end
 end
-
--- Alerta de início de cast
-function f:HandleSpellCastStart(spellName)
-    if trackedSpells[spellName] then
-        local targetName = UnitName("target") or "???"
-        SendAlert("cast_" .. spellName, spellName .. " sendo conjurado em " .. targetName .. "!")
-    end
-end
-
--- Alerta de aplicação de DoT
-function f:HandleDotApplied(spellName, destName, destGUID)
-    if trackedDots[spellName] then
-        local name = destName or "???"
-        SendAlert("dot_" .. spellName .. "_" .. destGUID, spellName .. " aplicado em " .. name .. "!")
-    end
-end
-
--- Alerta de remoção de DoT
-function f:HandleDotRemoved(spellName, destName, destGUID)
-    if trackedDots[spellName] then
-        local name = destName or "???"
-        SendAlert("remove_" .. spellName .. "_" .. destGUID, spellName .. " REMOVIDO de " .. name .. "!")
-    end
-end
-
--- Alerta de debuff recebido
-function f:HandleDebuffApplied(spellId, spellName, sourceName)
-    if trackedDebuffs[spellId] then
-        local debuffName = trackedDebuffs[spellId]
-
-        -- Aqui você pode colocar mensagens específicas para certos debuffs
-        if debuffName == "Mortal Striker" or debuffName == "Mortal Strike" then
-            SendAlert("debuff_" .. spellId, " Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "! Cura reduzida em 50%!")
-        else
-            SendAlert("debuff_" .. spellId, "Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "!")
-        end
-    end
-end
-
-
--- Alerta de debuff removido
-function f:HandleDebuffRemoved(spellId, spellName, sourceName)
-    if trackedDebuffs[spellId] then
-        local debuffName = trackedDebuffs[spellId]
-        SendAlert("debuff_off_" .. spellId, debuffName .. " FINALIZADO! (Aplicado por " .. (sourceName or "???") .. ")")
-    end
-end
-
-
-
--- Comando manual de teste
-SLASH_FS1 = "/fs"
-SlashCmdList["FS"] = function()
-    SendChatMessage("Teste FearAlert!", "YELL")
-end
-
--- Eventos registrados
-f:RegisterEvent("PLAYER_LOGIN")
-f:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
