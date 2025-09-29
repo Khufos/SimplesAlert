@@ -205,6 +205,7 @@ function SimpleAlert:OnInitialize()
     self.db = AceDB:New("SimpleAlertDB", defaults, true)
     self:RegisterChatCommand("sa", "ChatCommand")
     self:RegisterChatCommand("simplealert", "ChatCommand")
+    self:RegisterChatCommand("sa_fake_alert", "FakeAlertCommand")
 
     local options = {
         name = addonName,
@@ -256,6 +257,13 @@ function SimpleAlert:OnInitialize()
         PVE = "PvE",
     }
 
+    local function createDebuffGet(id)
+        return function() return SimpleAlert.db.profile.debuffs[id] end
+    end
+    local function createDebuffSet(id)
+        return function(info, val) SimpleAlert.db.profile.debuffs[id] = val end
+    end
+
     for spellId, data in pairs(trackedDebuffs) do
         local class = data.class
         if not options.args.debuffs.args[class] then
@@ -270,8 +278,8 @@ function SimpleAlert:OnInitialize()
             type = "toggle",
             name = data.name,
             desc = "Ativar/desativar alerta para " .. data.name,
-            get = function(info) return self.db.profile.debuffs[spellId] end,
-            set = function(info, val) self.db.profile.debuffs[spellId] = val end,
+            get = createDebuffGet(spellId),
+            set = createDebuffSet(spellId),
         }
     end
 
@@ -293,6 +301,21 @@ function SimpleAlert:ChatCommand(input)
     end
 end
 
+function SimpleAlert:FakeAlertCommand(input)
+    local spellId = 5782 -- Fear
+    local spellName = trackedDebuffs[spellId].name
+    local sourceName = "Fake Warlock"
+    
+    self:Print("Sending fake alert for " .. spellName)
+    
+    if self.db.profile.debuffs[spellId] then
+        self:SendAlert("debuff_" .. spellId, "Recebi " .. spellName .. " de " .. sourceName .. "!")
+        self:Print("Fake alert sent.")
+    else
+        self:Print(spellName .. " alert is disabled in the options.")
+    end
+end
+
 function SimpleAlert:SendAlert(key, message, cooldown)
     cooldown = cooldown or 5
     if not self.lastAlertTimes then self.lastAlertTimes = {} end
@@ -304,29 +327,28 @@ function SimpleAlert:SendAlert(key, message, cooldown)
 end
 
 function SimpleAlert:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local _, eventType, _, sourceName, _, _, destName, _, spellId, spellName = select(1, ...)
-    local sourceGUID, destGUID = select(3, ...), select(7, ...)
+    local timestamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellId, spellName = ...
 
     if sourceGUID == UnitGUID("player") then
-        if eventType == "SPELL_CAST_START" and self.db.profile.spells[spellName] and trackedSpells[spellName] then
+        if eventType == "SPELL_CAST_START" and trackedSpells[spellName] and self.db.profile.spells[spellName] then
             local targetName = UnitName("target") or "???"
             self:SendAlert("cast_" .. spellName, spellName .. " sendo conjurado em " .. targetName .. "!")
-        elseif eventType == "SPELL_AURA_APPLIED" and self.db.profile.dots[spellName] and trackedDots[spellName] then
+        elseif eventType == "SPELL_AURA_APPLIED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
             self:SendAlert("dot_" .. spellName .. "_" .. destGUID, spellName .. " aplicado em " .. (destName or "???") .. "!")
-        elseif eventType == "SPELL_AURA_REMOVED" and self.db.profile.dots[spellName] and trackedDots[spellName] then
+        elseif eventType == "SPELL_AURA_REMOVED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
             self:SendAlert("remove_" .. spellName .. "_" .. destGUID, spellName .. " REMOVIDO de " .. (destName or "???") .. "!")
         end
     end
 
     if destGUID == UnitGUID("player") then
-        if eventType == "SPELL_AURA_APPLIED" and self.db.profile.debuffs[spellId] and trackedDebuffs[spellId] then
+        if eventType == "SPELL_AURA_APPLIED" and trackedDebuffs[spellId] and self.db.profile.debuffs[spellId] then
             local debuffName = trackedDebuffs[spellId].name
             if debuffName == "Mortal Strike" then
                 self:SendAlert("debuff_" .. spellId, " Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "! Cura reduzida em 50%!")
             else
                 self:SendAlert("debuff_" .. spellId, "Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "!")
             end
-        elseif eventType == "SPELL_AURA_REMOVED" and self.db.profile.debuffs[spellId] and trackedDebuffs[spellId] then
+        elseif eventType == "SPELL_AURA_REMOVED" and trackedDebuffs[spellId] and self.db.profile.debuffs[spellId] then
             local debuffName = trackedDebuffs[spellId].name
             self:SendAlert("debuff_off_" .. spellId, debuffName .. " FINALIZADO! (Aplicado por " .. (sourceName or "???") .. ")")
         end
