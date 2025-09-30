@@ -14,10 +14,9 @@ Todos os alertas são configuráveis e podem ser ativados ou desativados individ
 
 ## Como usar?
 
-Para abrir o painel de configurações, digite um dos seguintes comandos no chat:
+Para abrir o painel de configurações, digite o seguinte comando no chat:
 
--   `/sa`
--   `/simplealert`
+-   `/salert`
 
 No painel, você pode navegar pelas seções e marcar/desmarcar quais alertas deseja receber.
 
