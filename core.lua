@@ -203,9 +203,8 @@ function SimpleAlert:OnInitialize()
     end
 
     self.db = AceDB:New("SimpleAlertDB", defaults, true)
-    self:RegisterChatCommand("sa", "ChatCommand")
-    self:RegisterChatCommand("simplealert", "ChatCommand")
-    self:RegisterChatCommand("sa_fake_alert", "FakeAlertCommand")
+    self:RegisterChatCommand("salert", "ChatCommand")
+    self:RegisterChatCommand("salert_test", "TestAlertCommand")
 
     local options = {
         name = addonName,
@@ -237,7 +236,12 @@ function SimpleAlert:OnInitialize()
             name = spellName,
             desc = "Ativar/desativar alerta para " .. spellName,
             get = getToggle,
-            set = setToggle,
+            set = function(info, val) 
+                setToggle(info, val)
+                local status = val and "ativado" or "desativado"
+                local message = spellName .. " " .. status
+                SimpleAlert:Print(message)
+            end,
         }
     end
 
@@ -247,7 +251,12 @@ function SimpleAlert:OnInitialize()
             name = dotName,
             desc = "Ativar/desativar alerta para " .. dotName,
             get = getToggle,
-            set = setToggle,
+            set = function(info, val) 
+                setToggle(info, val)
+                local status = val and "ativado" or "desativado"
+                local message = dotName .. " " .. status
+                SimpleAlert:Print(message)
+            end,
         }
     end
 
@@ -261,7 +270,12 @@ function SimpleAlert:OnInitialize()
         return function() return SimpleAlert.db.profile.debuffs[id] end
     end
     local function createDebuffSet(id)
-        return function(info, val) SimpleAlert.db.profile.debuffs[id] = val end
+        return function(info, val) 
+            SimpleAlert.db.profile.debuffs[id] = val 
+            local status = val and "ativado" or "desativado"
+            local message = trackedDebuffs[id].name .. " " .. status
+            SimpleAlert:Print(message)
+        end
     end
 
     for spellId, data in pairs(trackedDebuffs) do
@@ -288,7 +302,7 @@ function SimpleAlert:OnInitialize()
     AceConfig:RegisterOptionsTable(addonName, options)
     AceConfigDialog:AddToBlizOptions(addonName, addonName)
 
-    self:Print("Carregado! Use /sa para configurar.")
+    self:Print("Carregado! Use /salert para configurar.")
 end
 
 function SimpleAlert:OnEnable()
@@ -301,7 +315,7 @@ function SimpleAlert:ChatCommand(input)
     end
 end
 
-function SimpleAlert:FakeAlertCommand(input)
+function SimpleAlert:TestAlertCommand(input)
     local spellId = 5782 -- Fear
     local spellName = trackedDebuffs[spellId].name
     local sourceName = "Fake Warlock"
@@ -327,20 +341,16 @@ function SimpleAlert:SendAlert(key, message, cooldown)
 end
 
 function SimpleAlert:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local timestamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags = ...
-    local spellId, spellName, spellSchool, auraType
+    local _, timestamp, eventType, sourceGUID, sourceName, _, destGUID, destName, _, spellId, spellName, spellSchool, auraType = ...
 
-    if eventType == "SPELL_AURA_APPLIED" or eventType == "SPELL_AURA_REMOVED" then
-        spellId, spellName, spellSchool, auraType = select(12, ...)
-    elseif eventType == "SPELL_CAST_START" then
-        spellId, spellName, spellSchool = select(12, ...)
+    if eventType == "SPELL_CAST_START" and trackedSpells[spellName] and self.db.profile.spells[spellName] then
+        if sourceGUID ~= UnitGUID("player") then
+            self:SendAlert("cast_" .. spellName, spellName .. " sendo conjurado por " .. (sourceName or "???") .. "!")
+        end
     end
 
     if sourceGUID == UnitGUID("player") then
-        if eventType == "SPELL_CAST_START" and trackedSpells[spellName] and self.db.profile.spells[spellName] then
-            local targetName = UnitName("target") or "???"
-            self:SendAlert("cast_" .. spellName, spellName .. " sendo conjurado em " .. targetName .. "!")
-        elseif eventType == "SPELL_AURA_APPLIED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
+        if eventType == "SPELL_AURA_APPLIED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
             self:SendAlert("dot_" .. spellName .. "_" .. destGUID, spellName .. " aplicado em " .. (destName or "???") .. "!")
         elseif eventType == "SPELL_AURA_REMOVED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
             self:SendAlert("remove_" .. spellName .. "_" .. destGUID, spellName .. " REMOVIDO de " .. (destName or "???") .. "!")
