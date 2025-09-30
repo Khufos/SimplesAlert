@@ -327,7 +327,14 @@ function SimpleAlert:SendAlert(key, message, cooldown)
 end
 
 function SimpleAlert:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local timestamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellId, spellName = ...
+    local timestamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags = ...
+    local spellId, spellName, spellSchool, auraType
+
+    if eventType == "SPELL_AURA_APPLIED" or eventType == "SPELL_AURA_REMOVED" then
+        spellId, spellName, spellSchool, auraType = select(12, ...)
+    elseif eventType == "SPELL_CAST_START" then
+        spellId, spellName, spellSchool = select(12, ...)
+    end
 
     if sourceGUID == UnitGUID("player") then
         if eventType == "SPELL_CAST_START" and trackedSpells[spellName] and self.db.profile.spells[spellName] then
@@ -342,14 +349,16 @@ function SimpleAlert:COMBAT_LOG_EVENT_UNFILTERED(...)
 
     if destGUID == UnitGUID("player") then
         if eventType == "SPELL_AURA_APPLIED" and trackedDebuffs[spellId] and self.db.profile.debuffs[spellId] then
-            local debuffName = trackedDebuffs[spellId].name
+            local debuffInfo = trackedDebuffs[spellId]
+            local debuffName = debuffInfo.name
             if debuffName == "Mortal Strike" then
                 self:SendAlert("debuff_" .. spellId, " Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "! Cura reduzida em 50%!")
             else
                 self:SendAlert("debuff_" .. spellId, "Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "!")
             end
         elseif eventType == "SPELL_AURA_REMOVED" and trackedDebuffs[spellId] and self.db.profile.debuffs[spellId] then
-            local debuffName = trackedDebuffs[spellId].name
+            local debuffInfo = trackedDebuffs[spellId]
+            local debuffName = debuffInfo.name
             self:SendAlert("debuff_off_" .. spellId, debuffName .. " FINALIZADO! (Aplicado por " .. (sourceName or "???") .. ")")
         end
     end
