@@ -237,17 +237,101 @@ function SimpleAlert:OnInitialize()
             spells = {
                 type = "group",
                 name = "Casts Inimigos",
-                args = {},
+                args = {
+                    selectAllSpells = {
+                        type = "execute",
+                        name = "Selecionar Todos",
+                        order = 1,
+                        func = function()
+                            for spellName in pairs(trackedSpells) do
+                                SimpleAlert.db.profile.spells[spellName] = true
+                            end
+                            SimpleAlert:Print("Todos os casts inimigos selecionados.")
+                        end,
+                    },
+                    deselectAllSpells = {
+                        type = "execute",
+                        name = "Desselecionar Todos",
+                        order = 2,
+                        func = function()
+                            for spellName in pairs(trackedSpells) do
+                                SimpleAlert.db.profile.spells[spellName] = false
+                            end
+                            SimpleAlert:Print("Todos os casts inimigos desselecionados.")
+                        end,
+                    },
+                    spells_separator = {
+                        type = "header",
+                        name = "",
+                        order = 3
+                    }
+                },
             },
             dots = {
                 type = "group",
                 name = "Seus DoTs",
-                args = {},
+                args = {
+                    selectAllDots = {
+                        type = "execute",
+                        name = "Selecionar Todos",
+                        order = 1,
+                        func = function()
+                            for dotName in pairs(trackedDots) do
+                                SimpleAlert.db.profile.dots[dotName] = true
+                            end
+                            SimpleAlert:Print("Todos os DoTs selecionados.")
+                        end,
+                    },
+                    deselectAllDots = {
+                        type = "execute",
+                        name = "Desselecionar Todos",
+                        order = 2,
+                        func = function()
+                            for dotName in pairs(trackedDots) do
+                                SimpleAlert.db.profile.dots[dotName] = false
+                            end
+                            SimpleAlert:Print("Todos os DoTs desselecionados.")
+                        end,
+                    },
+                    dots_separator = {
+                        type = "header",
+                        name = "",
+                        order = 3
+                    }
+                },
             },
             debuffs = {
                 type = "group",
                 name = "Debuffs Recebidos",
-                args = {},
+                args = {
+                    selectAllDebuffs = {
+                        type = "execute",
+                        name = "Selecionar Todos",
+                        order = 1,
+                        func = function()
+                            for spellId in pairs(trackedDebuffs) do
+                                SimpleAlert.db.profile.debuffs[spellId] = true
+                            end
+                            SimpleAlert:Print("Todos os debuffs selecionados.")
+                        end,
+                    },
+                    deselectAllDebuffs = {
+                        type = "execute",
+                        name = "Desselecionar Todos",
+                        order = 2,
+                        func = function()
+                            for spellId in pairs(trackedDebuffs) do
+                                SimpleAlert.db.profile.debuffs[spellId] = false
+                            end
+                            SimpleAlert:Print("Todos os debuffs desselecionados.")
+                        end,
+                    },
+                    debuffs_separator = {
+                        type = "header",
+                        name = "",
+                        order = 3
+                    }
+                },
             },
         },
     }
