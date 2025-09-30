@@ -172,6 +172,7 @@ local trackedDebuffs = {
 
 local defaults = {
     profile = {
+        channel = "PARTY",
         spells = {},
         dots = {},
         debuffs = {},
@@ -211,6 +212,28 @@ function SimpleAlert:OnInitialize()
         handler = self,
         type = "group",
         args = {
+            general = {
+                type = "group",
+                name = "Geral",
+                args = {
+                    channel = {
+                        type = "select",
+                        name = "Canal do Chat",
+                        desc = "Escolha para onde as mensagens de alerta serão enviadas.",
+                        values = {
+                            ["SAY"] = "Dizer",
+                            ["PARTY"] = "Grupo",
+                            ["YELL"] = "Gritar",
+                            ["BG"] = "Campo de Batalha",
+                        },
+                        get = function(info) return SimpleAlert.db.profile.channel end,
+                        set = function(info, value) 
+                            SimpleAlert.db.profile.channel = value 
+                            SimpleAlert:Print("Canal de alerta definido para: " .. value)
+                        end,
+                    },
+                },
+            },
             spells = {
                 type = "group",
                 name = "Casts Inimigos",
@@ -335,7 +358,7 @@ function SimpleAlert:SendAlert(key, message, cooldown)
     if not self.lastAlertTimes then self.lastAlertTimes = {} end
     local now = GetTime()
     if not self.lastAlertTimes[key] or (now - self.lastAlertTimes[key]) > cooldown then
-        SendChatMessage(message, "PARTY")
+        SendChatMessage(message, self.db.profile.channel)
         self.lastAlertTimes[key] = now
     end
 end
