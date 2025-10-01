@@ -2,7 +2,7 @@
 
 Este arquivo descreve as próximas funcionalidades a serem implementadas para melhorar o addon.
 
-## 1. Painel de Configuração (A mais importante)
+## ✅ 1. Painel de Configuração (A mais importante)
 
 **Objetivo:** Permitir que os usuários personalizem o comportamento do addon através de um menu na interface do jogo.
 
@@ -44,7 +44,7 @@ local options = {
 }
 ```
 
-## 2. Canais de Alerta Configuráveis
+## ✅ 2. Canais de Alerta Configuráveis
 
 **Objetivo:** Permitir que o usuário escolha para onde as mensagens de alerta são enviadas.
 
@@ -59,7 +59,7 @@ local channel = db.profile.alertChannel -- Ex: "RAID"
 SendChatMessage(message, channel)
 ```
 
-## 3. Mensagens Personalizáveis
+## ⏳ 3. Mensagens Personalizáveis
 
 **Objetivo:** Permitir que o usuário edite o texto dos alertas.
 
@@ -76,7 +76,7 @@ local formattedMessage = userMessage:gsub("{spell}", spellName):gsub("{source}",
 SendChatMessage(formattedMessage, channel)
 ```
 
-## 4. Alertas Visuais e Sonoros
+## ✅ 4. Alertas Visuais e Sonoros
 
 **Objetivo:** Fornecer feedback não textual para os eventos.
 
@@ -89,7 +89,7 @@ SendChatMessage(formattedMessage, channel)
     - Adicionar uma opção para escolher um som da lista de sons do jogo (`libs/LibSharedMedia-3.0` pode ajudar com isso).
     - Usar a função `PlaySoundFile()` para tocar o som escolhido quando o alerta é ativado.
 
-## 5. Sistema de Perfis (Profiles)
+## ✅ 5. Sistema de Perfis (Profiles)
 
 **Objetivo:** Permitir que os usuários salvem e troquem entre diferentes conjuntos de configurações.
 
@@ -98,7 +98,7 @@ SendChatMessage(formattedMessage, channel)
 - Isso adicionará automaticamente as opções de "Profiles" ao painel de configuração.
 - Pode-se usar `LibDualSpec-1.0` para detectar a troca de talentos do jogador e trocar o perfil do addon automaticamente.
 
-## 6. Filtros por Zona/Contexto
+## ⏳ 6. Filtros por Zona/Contexto
 
 **Objetivo:** Controlar onde e quando os alertas estão ativos.
 

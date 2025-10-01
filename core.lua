@@ -4,6 +4,7 @@ local SimpleAlert = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceConsole-3.0"
 local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local AceDB = LibStub("AceDB-3.0")
+local AceDBOptions = LibStub("AceDBOptions-3.0")
 
 -- Feitiços que queremos alertar ao iniciar cast
 local trackedSpells = {
@@ -171,6 +172,17 @@ local trackedDebuffs = {
 
 local defaults = {
     profile = {
+        channel = "PARTY",
+        visualAlerts = true,
+        soundAlerts = true,
+        sound = "Game-Beep-1",
+        frame = {
+            point = "CENTER",
+            relativePoint = "CENTER",
+            xOfs = 0,
+            yOfs = 0,
+            size = 64,
+        },
         spells = {},
         dots = {},
         debuffs = {},
@@ -178,16 +190,43 @@ local defaults = {
 }
 
 local function getToggle(info)
-    local category, key = unpack(info)
+    local category = info[1]
+    local key = info[#info]
     return SimpleAlert.db.profile[category][key]
 end
 
 local function setToggle(info, value)
-    local category, key = unpack(info)
+    local category = info[1]
+    local key = info[#info]
     SimpleAlert.db.profile[category][key] = value
 end
 
 function SimpleAlert:OnInitialize()
+    self.db = AceDB:New("SimpleAlertDB", defaults, true)
+
+    -- Frame para o alerta visual
+    local frame = CreateFrame("Frame", "SimpleAlertIconFrame", UIParent)
+    frame:SetSize(self.db.profile.frame.size, self.db.profile.frame.size)
+    frame:SetPoint(self.db.profile.frame.point, UIParent, self.db.profile.frame.relativePoint, self.db.profile.frame.xOfs, self.db.profile.frame.yOfs)
+    frame:SetFrameStrata("HIGH")
+    frame:Hide()
+
+    local texture = frame:CreateTexture(nil, "BACKGROUND")
+    texture:SetAllPoints(frame)
+    frame.texture = texture
+
+    frame:SetScript("OnUpdate", function(self, elapsed)
+        if self.countdown then
+            self.countdown = self.countdown - elapsed
+            if self.countdown <= 0 then
+                self:Hide()
+                self.countdown = nil
+            end
+        end
+    end)
+
+    self.visualAlertFrame = frame
+
     -- Populando os defaults
     for spellName in pairs(trackedSpells) do
         defaults.profile.spells[spellName] = true
@@ -199,29 +238,169 @@ function SimpleAlert:OnInitialize()
         defaults.profile.debuffs[spellId] = true
     end
 
-    self.db = AceDB:New("SimpleAlertDB", defaults, true)
-    self:RegisterChatCommand("sa", "ChatCommand")
-    self:RegisterChatCommand("simplealert", "ChatCommand")
+    self:RegisterChatCommand("salert", "ChatCommand")
+    self:RegisterChatCommand("salert_test", "TestAlertCommand")
 
     local options = {
         name = addonName,
         handler = self,
         type = "group",
         args = {
+            general = {
+                type = "group",
+                name = "Geral",
+                args = {
+                    channel = {
+                        type = "select",
+                        name = "Canal do Chat",
+                        desc = "Escolha para onde as mensagens de alerta serão enviadas.",
+                        values = {
+                            ["SAY"] = "Dizer",
+                            ["PARTY"] = "Grupo",
+                            ["YELL"] = "Gritar",
+                            ["BG"] = "Campo de Batalha",
+                        },
+                        get = function(info) return SimpleAlert.db.profile.channel end,
+                        set = function(info, value) 
+                            SimpleAlert.db.profile.channel = value 
+                            SimpleAlert:Print("Canal de alerta definido para: " .. value)
+                        end,
+                    },
+                },
+            },
+            alerts = {
+                type = "group",
+                name = "Alertas",
+                args = {
+                    visualToggle = {
+                        type = "toggle",
+                        name = "Alerta Visual",
+                        desc = "Mostra um ícone na tela.",
+                        get = function(info) return SimpleAlert.db.profile.visualAlerts end,
+                        set = function(info, val) SimpleAlert.db.profile.visualAlerts = val end,
+                    },
+                    soundToggle = {
+                        type = "toggle",
+                        name = "Alerta Sonoro",
+                        desc = "Toca um som.",
+                        get = function(info) return SimpleAlert.db.profile.soundAlerts end,
+                        set = function(info, val) SimpleAlert.db.profile.soundAlerts = val end,
+                    },
+                    sound = {
+                        type = "select",
+                        dialogControl = "LSM30_Sound",
+                        name = "Som do Alerta",
+                        desc = "Escolha o som que será tocado.",
+                        values = AceGUIWidgetLSMlists.sound,
+                        get = function(info) return SimpleAlert.db.profile.sound end,
+                        set = function(info, val) 
+                            SimpleAlert.db.profile.sound = val
+                            local soundHandle = LibStub("LibSharedMedia-3.0"):Fetch("sound", val)
+                            if soundHandle then
+                                PlaySoundFile(soundHandle, "SFX")
+                            end
+                        end,
+                    },
+                },
+            },
             spells = {
                 type = "group",
                 name = "Casts Inimigos",
-                args = {},
+                args = {
+                    selectAllSpells = {
+                        type = "execute",
+                        name = "Selecionar Todos",
+                        order = 1,
+                        func = function()
+                            for spellName in pairs(trackedSpells) do
+                                SimpleAlert.db.profile.spells[spellName] = true
+                            end
+                            SimpleAlert:Print("Todos os casts inimigos selecionados.")
+                        end,
+                    },
+                    deselectAllSpells = {
+                        type = "execute",
+                        name = "Desselecionar Todos",
+                        order = 2,
+                        func = function()
+                            for spellName in pairs(trackedSpells) do
+                                SimpleAlert.db.profile.spells[spellName] = false
+                            end
+                            SimpleAlert:Print("Todos os casts inimigos desselecionados.")
+                        end,
+                    },
+                    spells_separator = {
+                        type = "header",
+                        name = "",
+                        order = 3
+                    }
+                },
             },
             dots = {
                 type = "group",
                 name = "Seus DoTs",
-                args = {},
+                args = {
+                    selectAllDots = {
+                        type = "execute",
+                        name = "Selecionar Todos",
+                        order = 1,
+                        func = function()
+                            for dotName in pairs(trackedDots) do
+                                SimpleAlert.db.profile.dots[dotName] = true
+                            end
+                            SimpleAlert:Print("Todos os DoTs selecionados.")
+                        end,
+                    },
+                    deselectAllDots = {
+                        type = "execute",
+                        name = "Desselecionar Todos",
+                        order = 2,
+                        func = function()
+                            for dotName in pairs(trackedDots) do
+                                SimpleAlert.db.profile.dots[dotName] = false
+                            end
+                            SimpleAlert:Print("Todos os DoTs desselecionados.")
+                        end,
+                    },
+                    dots_separator = {
+                        type = "header",
+                        name = "",
+                        order = 3
+                    }
+                },
             },
             debuffs = {
                 type = "group",
                 name = "Debuffs Recebidos",
-                args = {},
+                args = {
+                    selectAllDebuffs = {
+                        type = "execute",
+                        name = "Selecionar Todos",
+                        order = 1,
+                        func = function()
+                            for spellId in pairs(trackedDebuffs) do
+                                SimpleAlert.db.profile.debuffs[spellId] = true
+                            end
+                            SimpleAlert:Print("Todos os debuffs selecionados.")
+                        end,
+                    },
+                    deselectAllDebuffs = {
+                        type = "execute",
+                        name = "Desselecionar Todos",
+                        order = 2,
+                        func = function()
+                            for spellId in pairs(trackedDebuffs) do
+                                SimpleAlert.db.profile.debuffs[spellId] = false
+                            end
+                            SimpleAlert:Print("Todos os debuffs desselecionados.")
+                        end,
+                    },
+                    debuffs_separator = {
+                        type = "header",
+                        name = "",
+                        order = 3
+                    }
+                },
             },
         },
     }
@@ -233,7 +412,12 @@ function SimpleAlert:OnInitialize()
             name = spellName,
             desc = "Ativar/desativar alerta para " .. spellName,
             get = getToggle,
-            set = setToggle,
+            set = function(info, val) 
+                setToggle(info, val)
+                local status = val and "ativado" or "desativado"
+                local message = spellName .. " " .. status
+                SimpleAlert:Print(message)
+            end,
         }
     end
 
@@ -243,7 +427,12 @@ function SimpleAlert:OnInitialize()
             name = dotName,
             desc = "Ativar/desativar alerta para " .. dotName,
             get = getToggle,
-            set = setToggle,
+            set = function(info, val) 
+                setToggle(info, val)
+                local status = val and "ativado" or "desativado"
+                local message = dotName .. " " .. status
+                SimpleAlert:Print(message)
+            end,
         }
     end
 
@@ -252,6 +441,18 @@ function SimpleAlert:OnInitialize()
         IMMUNITY = "Imunidades",
         PVE = "PvE",
     }
+
+    local function createDebuffGet(id)
+        return function() return SimpleAlert.db.profile.debuffs[id] end
+    end
+    local function createDebuffSet(id)
+        return function(info, val) 
+            SimpleAlert.db.profile.debuffs[id] = val 
+            local status = val and "ativado" or "desativado"
+            local message = trackedDebuffs[id].name .. " " .. status
+            SimpleAlert:Print(message)
+        end
+    end
 
     for spellId, data in pairs(trackedDebuffs) do
         local class = data.class
@@ -267,15 +468,17 @@ function SimpleAlert:OnInitialize()
             type = "toggle",
             name = data.name,
             desc = "Ativar/desativar alerta para " .. data.name,
-            get = function(info) return self.db.profile.debuffs[spellId] end,
-            set = function(info, val) self.db.profile.debuffs[spellId] = val end,
+            get = createDebuffGet(spellId),
+            set = createDebuffSet(spellId),
         }
     end
+
+    options.args.profiles = AceDBOptions:GetOptionsTable(self.db)
 
     AceConfig:RegisterOptionsTable(addonName, options)
     AceConfigDialog:AddToBlizOptions(addonName, addonName)
 
-    self:Print("Carregado! Use /sa para configurar.")
+    self:Print("Carregado! Use /salert para configurar.")
 end
 
 function SimpleAlert:OnEnable()
@@ -288,42 +491,77 @@ function SimpleAlert:ChatCommand(input)
     end
 end
 
-function SimpleAlert:SendAlert(key, message, cooldown)
+function SimpleAlert:TestAlertCommand(input)
+    local spellId = tonumber(input) or 5782 -- Fear
+    local spellName = trackedDebuffs[spellId] and trackedDebuffs[spellId].name or "Unknown Spell"
+    local sourceName = "Fake Warlock"
+    
+    self:Print("Sending fake alert for " .. spellName)
+    
+    if self.db.profile.debuffs[spellId] then
+        self:SendAlert("debuff_" .. spellId, "Recebi " .. spellName .. " de " .. sourceName .. "!", 5, spellId)
+        self:Print("Fake alert sent.")
+    else
+        self:Print(spellName .. " alert is disabled in the options.")
+    end
+end
+
+function SimpleAlert:SendAlert(key, message, cooldown, spellId)
     cooldown = cooldown or 5
     if not self.lastAlertTimes then self.lastAlertTimes = {} end
     local now = GetTime()
     if not self.lastAlertTimes[key] or (now - self.lastAlertTimes[key]) > cooldown then
-        SendChatMessage(message, "PARTY")
+        SendChatMessage(message, self.db.profile.channel)
         self.lastAlertTimes[key] = now
+
+        if self.db.profile.visualAlerts and spellId then
+            local _, _, texture = GetSpellInfo(spellId)
+            if texture then
+                self.visualAlertFrame.texture:SetTexture(texture)
+                self.visualAlertFrame:Show()
+                self.visualAlertFrame.countdown = 3 -- Esconde depois de 3 segundos
+            end
+        end
+
+        if self.db.profile.soundAlerts then
+            local soundHandle = LibStub("LibSharedMedia-3.0"):Fetch("sound", self.db.profile.sound)
+            if soundHandle then
+                PlaySoundFile(soundHandle, "SFX")
+            end
+        end
     end
 end
 
 function SimpleAlert:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local _, eventType, _, sourceName, _, _, destName, _, spellId, spellName = select(1, ...)
-    local sourceGUID, destGUID = select(3, ...), select(7, ...)
+    local _, timestamp, eventType, sourceGUID, sourceName, _, destGUID, destName, _, spellId, spellName, spellSchool, auraType = ...
+
+    if eventType == "SPELL_CAST_START" and trackedSpells[spellName] and self.db.profile.spells[spellName] then
+        if sourceGUID ~= UnitGUID("player") then
+            self:SendAlert("cast_" .. spellName, spellName .. " sendo conjurado por " .. (sourceName or "???") .. "!", 5, spellId)
+        end
+    end
 
     if sourceGUID == UnitGUID("player") then
-        if eventType == "SPELL_CAST_START" and self.db.profile.spells[spellName] and trackedSpells[spellName] then
-            local targetName = UnitName("target") or "???"
-            self:SendAlert("cast_" .. spellName, spellName .. " sendo conjurado em " .. targetName .. "!")
-        elseif eventType == "SPELL_AURA_APPLIED" and self.db.profile.dots[spellName] and trackedDots[spellName] then
-            self:SendAlert("dot_" .. spellName .. "_" .. destGUID, spellName .. " aplicado em " .. (destName or "???") .. "!")
-        elseif eventType == "SPELL_AURA_REMOVED" and self.db.profile.dots[spellName] and trackedDots[spellName] then
-            self:SendAlert("remove_" .. spellName .. "_" .. destGUID, spellName .. " REMOVIDO de " .. (destName or "???") .. "!")
+        if eventType == "SPELL_AURA_APPLIED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
+            self:SendAlert("dot_" .. spellName .. "_" .. destGUID, spellName .. " aplicado em " .. (destName or "???") .. "!", 5, spellId)
+        elseif eventType == "SPELL_AURA_REMOVED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
+            self:SendAlert("remove_" .. spellName .. "_" .. destGUID, spellName .. " REMOVIDO de " .. (destName or "???") .. "!", 5, spellId)
         end
     end
 
     if destGUID == UnitGUID("player") then
-        if eventType == "SPELL_AURA_APPLIED" and self.db.profile.debuffs[spellId] and trackedDebuffs[spellId] then
-            local debuffName = trackedDebuffs[spellId].name
+        if eventType == "SPELL_AURA_APPLIED" and trackedDebuffs[spellId] and self.db.profile.debuffs[spellId] then
+            local debuffInfo = trackedDebuffs[spellId]
+            local debuffName = debuffInfo.name
             if debuffName == "Mortal Strike" then
-                self:SendAlert("debuff_" .. spellId, " Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "! Cura reduzida em 50%!")
+                self:SendAlert("debuff_" .. spellId, " Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "! Cura reduzida em 50%!", 5, spellId)
             else
-                self:SendAlert("debuff_" .. spellId, "Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "!")
+                self:SendAlert("debuff_" .. spellId, "Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "!", 5, spellId)
             end
-        elseif eventType == "SPELL_AURA_REMOVED" and self.db.profile.debuffs[spellId] and trackedDebuffs[spellId] then
-            local debuffName = trackedDebuffs[spellId].name
-            self:SendAlert("debuff_off_" .. spellId, debuffName .. " FINALIZADO! (Aplicado por " .. (sourceName or "???") .. ")")
+        elseif eventType == "SPELL_AURA_REMOVED" and trackedDebuffs[spellId] and self.db.profile.debuffs[spellId] then
+            local debuffInfo = trackedDebuffs[spellId]
+            local debuffName = debuffInfo.name
+            self:SendAlert("debuff_off_" .. spellId, debuffName .. " FINALIZADO! (Aplicado por " .. (sourceName or "???") .. ")", 5, spellId)
         end
     end
 end
