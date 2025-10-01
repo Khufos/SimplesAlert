@@ -76,7 +76,7 @@ local formattedMessage = userMessage:gsub("{spell}", spellName):gsub("{source}",
 SendChatMessage(formattedMessage, channel)
 ```
 
-## ⏳ 4. Alertas Visuais e Sonoros
+## ✅ 4. Alertas Visuais e Sonoros
 
 **Objetivo:** Fornecer feedback não textual para os eventos.
 
