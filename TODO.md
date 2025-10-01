@@ -89,7 +89,7 @@ SendChatMessage(formattedMessage, channel)
     - Adicionar uma opção para escolher um som da lista de sons do jogo (`libs/LibSharedMedia-3.0` pode ajudar com isso).
     - Usar a função `PlaySoundFile()` para tocar o som escolhido quando o alerta é ativado.
 
-## ⏳ 5. Sistema de Perfis (Profiles)
+## ✅ 5. Sistema de Perfis (Profiles)
 
 **Objetivo:** Permitir que os usuários salvem e troquem entre diferentes conjuntos de configurações.
 
