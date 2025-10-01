@@ -534,7 +534,6 @@ end
 
 function SimpleAlert:COMBAT_LOG_EVENT_UNFILTERED(...)
     local _, timestamp, eventType, sourceGUID, sourceName, _, destGUID, destName, _, spellId, spellName, spellSchool, auraType = ...
-    -- local timestamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellId, spellName, spellSchool, auraType = ...
 
     if eventType == "SPELL_CAST_START" and trackedSpells[spellName] and self.db.profile.spells[spellName] then
         if sourceGUID ~= UnitGUID("player") then
