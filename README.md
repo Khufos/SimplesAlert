@@ -35,6 +35,30 @@ Receba um aviso assim que um inimigo começar a conjurar feitiços rastreados.
 
 Seja notificado quando receber um debuff de uma classe inimiga. Os debuffs são organizados por classe no menu de opções, facilitando a personalização.
 
+## Formato dos Alertas
+
+Para facilitar a visualização e identificação rápida dos alertas no chat, o SimpleAlert utiliza um formato padronizado com ícones de raide (`{rtX}`). Cada tipo de evento tem um ícone e cor associado, tornando a comunicação mais clara e eficiente durante o combate.
+
+### Exemplos de Alertas:
+
+-   **Cast Inimigo:** `{rt1} >> Lava Burst << sendo conjurado por Inimigo {rt1}`
+-   **DoT Aplicado:** `{rt2} >> Flame Shock << aplicado em Alvo {rt2}`
+-   **DoT Removido:** `{rt3} >> Flame Shock << REMOVIDO de Alvo {rt3}`
+-   **Debuff Recebido:** `{rt4} >> Polymorph << recebido de Mago {rt4}`
+-   **Debuff Finalizado:** `{rt5} >> Polymorph << FINALIZADO (de Mago) {rt5}`
+-   **Alerta Especial (Mortal Strike):** `{rt8} >> Mortal Strike << de Guerreiro | CURA REDUZIDA! {rt8}`
+
+### Legenda dos Ícones:
+
+-   `{rt1}` (Amarelo / Estrela): Cast de inimigo.
+-   `{rt2}` (Laranja / Círculo): Seu DoT foi aplicado.
+-   `{rt3}` (Roxo / Diamante): Seu DoT foi removido.
+-   `{rt4}` (Verde / Triângulo): Debuff aplicado em você.
+-   `{rt5}` (Branco / Lua): Debuff finalizado em você.
+-   `{rt8}` (Caveira): Alerta crítico (ex: Mortal Strike).
+
+Este sistema de ícones e mensagens padronizadas ajuda a reduzir a poluição visual no chat e permite que você e seu grupo reajam mais rapidamente aos eventos importantes da luta.
+
 ## Instalação
 
 1.  Baixe o addon.

@@ -175,7 +175,14 @@ local defaults = {
         channel = "PARTY",
         visualAlerts = true,
         soundAlerts = true,
-        sound = "Game-Beep-1",
+        sounds = {
+            cast = "Game-Beep-1",
+            dot_applied = "Game-Beep-1",
+            dot_removed = "Game-Beep-1",
+            debuff_applied = "Game-Beep-1",
+            debuff_removed = "Game-Beep-1",
+            debuff_mortalstrike = "Game-Beep-1",
+        },
         frame = {
             point = "CENTER",
             relativePoint = "CENTER",
@@ -203,6 +210,9 @@ end
 
 function SimpleAlert:OnInitialize()
     self.db = AceDB:New("SimpleAlertDB", defaults, true)
+    if not self.db.profile.sounds then
+        self.db.profile.sounds = defaults.profile.sounds
+    end
 
     -- Frame para o alerta visual
     local frame = CreateFrame("Frame", "SimpleAlertIconFrame", UIParent)
@@ -281,27 +291,66 @@ function SimpleAlert:OnInitialize()
                     },
                     soundToggle = {
                         type = "toggle",
-                        name = "Alerta Sonoro",
-                        desc = "Toca um som.",
+                        name = "Alerta Sonoro (Geral)",
+                        desc = "Ativa ou desativa TODOS os sons de alerta.",
                         get = function(info) return SimpleAlert.db.profile.soundAlerts end,
                         set = function(info, val) SimpleAlert.db.profile.soundAlerts = val end,
                     },
-                    sound = {
+                },
+            },
+            sounds = {
+                type = "group",
+                name = "Sons dos Alertas",
+                args = {
+                    sound_cast = {
                         type = "select",
                         dialogControl = "LSM30_Sound",
-                        name = "Som do Alerta",
-                        desc = "Escolha o som que será tocado.",
+                        name = "Som para Cast Inimigo",
                         values = AceGUIWidgetLSMlists.sound,
-                        get = function(info) return SimpleAlert.db.profile.sound end,
-                        set = function(info, val) 
-                            SimpleAlert.db.profile.sound = val
-                            local soundHandle = LibStub("LibSharedMedia-3.0"):Fetch("sound", val)
-                            if soundHandle then
-                                PlaySoundFile(soundHandle, "SFX")
-                            end
-                        end,
+                        get = function(info) return SimpleAlert.db.profile.sounds.cast end,
+                        set = function(info, val) SimpleAlert.db.profile.sounds.cast = val end,
                     },
-                },
+                    sound_dot_applied = {
+                        type = "select",
+                        dialogControl = "LSM30_Sound",
+                        name = "Som para DoT Aplicado",
+                        values = AceGUIWidgetLSMlists.sound,
+                        get = function(info) return SimpleAlert.db.profile.sounds.dot_applied end,
+                        set = function(info, val) SimpleAlert.db.profile.sounds.dot_applied = val end,
+                    },
+                    sound_dot_removed = {
+                        type = "select",
+                        dialogControl = "LSM30_Sound",
+                        name = "Som para DoT Removido",
+                        values = AceGUIWidgetLSMlists.sound,
+                        get = function(info) return SimpleAlert.db.profile.sounds.dot_removed end,
+                        set = function(info, val) SimpleAlert.db.profile.sounds.dot_removed = val end,
+                    },
+                    sound_debuff_applied = {
+                        type = "select",
+                        dialogControl = "LSM30_Sound",
+                        name = "Som para Debuff Recebido",
+                        values = AceGUIWidgetLSMlists.sound,
+                        get = function(info) return SimpleAlert.db.profile.sounds.debuff_applied end,
+                        set = function(info, val) SimpleAlert.db.profile.sounds.debuff_applied = val end,
+                    },
+                    sound_debuff_removed = {
+                        type = "select",
+                        dialogControl = "LSM30_Sound",
+                        name = "Som para Debuff Finalizado",
+                        values = AceGUIWidgetLSMlists.sound,
+                        get = function(info) return SimpleAlert.db.profile.sounds.debuff_removed end,
+                        set = function(info, val) SimpleAlert.db.profile.sounds.debuff_removed = val end,
+                    },
+                    sound_debuff_mortalstrike = {
+                        type = "select",
+                        dialogControl = "LSM30_Sound",
+                        name = "Som para Mortal Strike",
+                        values = AceGUIWidgetLSMlists.sound,
+                        get = function(info) return SimpleAlert.db.profile.sounds.debuff_mortalstrike end,
+                        set = function(info, val) SimpleAlert.db.profile.sounds.debuff_mortalstrike = val end,
+                    },
+                }
             },
             spells = {
                 type = "group",
@@ -499,14 +548,14 @@ function SimpleAlert:TestAlertCommand(input)
     self:Print("Sending fake alert for " .. spellName)
     
     if self.db.profile.debuffs[spellId] then
-        self:SendAlert("debuff_" .. spellId, "Recebi " .. spellName .. " de " .. sourceName .. "!", 5, spellId)
+        self:SendAlert("debuff_" .. spellId, "Recebi " .. spellName .. " de " .. sourceName .. "!", 5, spellId, "debuff_applied")
         self:Print("Fake alert sent.")
     else
         self:Print(spellName .. " alert is disabled in the options.")
     end
 end
 
-function SimpleAlert:SendAlert(key, message, cooldown, spellId)
+function SimpleAlert:SendAlert(key, message, cooldown, spellId, alertType)
     cooldown = cooldown or 5
     if not self.lastAlertTimes then self.lastAlertTimes = {} end
     local now = GetTime()
@@ -523,10 +572,13 @@ function SimpleAlert:SendAlert(key, message, cooldown, spellId)
             end
         end
 
-        if self.db.profile.soundAlerts then
-            local soundHandle = LibStub("LibSharedMedia-3.0"):Fetch("sound", self.db.profile.sound)
-            if soundHandle then
-                PlaySoundFile(soundHandle, "SFX")
+        if self.db.profile.soundAlerts and alertType then
+            local sound = self.db.profile.sounds[alertType]
+            if sound then
+                local soundHandle = LibStub("LibSharedMedia-3.0"):Fetch("sound", sound)
+                if soundHandle then
+                    PlaySoundFile(soundHandle, "SFX")
+                end
             end
         end
     end
@@ -535,33 +587,36 @@ end
 function SimpleAlert:COMBAT_LOG_EVENT_UNFILTERED(...)
     local _, timestamp, eventType, sourceGUID, sourceName, _, destGUID, destName, _, spellId, spellName, spellSchool, auraType = ...
 
+    -- Alerta para casts de feitiços inimigos
     if eventType == "SPELL_CAST_START" and trackedSpells[spellName] and self.db.profile.spells[spellName] then
         if sourceGUID ~= UnitGUID("player") then
-            self:SendAlert("cast_" .. spellName, spellName .. " sendo conjurado por " .. (sourceName or "???") .. "!", 5, spellId)
+            self:SendAlert("cast_" .. spellName, "{rt1} >> " .. spellName .. " << sendo conjurado por " .. (sourceName or "???") .. " {rt1}", 5, spellId, "cast")
         end
     end
 
+    -- Alertas para seus DoTs aplicados ou removidos
     if sourceGUID == UnitGUID("player") then
         if eventType == "SPELL_AURA_APPLIED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
-            self:SendAlert("dot_" .. spellName .. "_" .. destGUID, spellName .. " aplicado em " .. (destName or "???") .. "!", 5, spellId)
+            self:SendAlert("dot_" .. spellName .. "_" .. destGUID, "{rt2} >> " .. spellName .. " << aplicado em " .. (destName or "???") .. " {rt2}", 5, spellId, "dot_applied")
         elseif eventType == "SPELL_AURA_REMOVED" and trackedDots[spellName] and self.db.profile.dots[spellName] then
-            self:SendAlert("remove_" .. spellName .. "_" .. destGUID, spellName .. " REMOVIDO de " .. (destName or "???") .. "!", 5, spellId)
+            self:SendAlert("remove_" .. spellName .. "_" .. destGUID, "{rt3} >> " .. spellName .. " << REMOVIDO de " .. (destName or "???") .. " {rt3}", 5, spellId, "dot_removed")
         end
     end
 
+    -- Alertas para debuffs recebidos por você
     if destGUID == UnitGUID("player") then
         if eventType == "SPELL_AURA_APPLIED" and trackedDebuffs[spellId] and self.db.profile.debuffs[spellId] then
             local debuffInfo = trackedDebuffs[spellId]
             local debuffName = debuffInfo.name
             if debuffName == "Mortal Strike" then
-                self:SendAlert("debuff_" .. spellId, " Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "! Cura reduzida em 50%!", 5, spellId)
+                self:SendAlert("debuff_" .. spellId, "{rt8} >> " .. debuffName .. " << de " .. (sourceName or "???") .. " | CURA REDUZIDA! {rt8}", 5, spellId, "debuff_mortalstrike")
             else
-                self:SendAlert("debuff_" .. spellId, "Recebi " .. debuffName .. " de " .. (sourceName or "???") .. "!", 5, spellId)
+                self:SendAlert("debuff_" .. spellId, "{rt4} >> " .. debuffName .. " << recebido de " .. (sourceName or "???") .. " {rt4}", 5, spellId, "debuff_applied")
             end
         elseif eventType == "SPELL_AURA_REMOVED" and trackedDebuffs[spellId] and self.db.profile.debuffs[spellId] then
             local debuffInfo = trackedDebuffs[spellId]
             local debuffName = debuffInfo.name
-            self:SendAlert("debuff_off_" .. spellId, debuffName .. " FINALIZADO! (Aplicado por " .. (sourceName or "???") .. ")", 5, spellId)
+            self:SendAlert("debuff_off_" .. spellId, "{rt5} >> " .. debuffName .. " << FINALIZADO (de " .. (sourceName or "???") .. ") {rt5}", 5, spellId, "debuff_removed")
         end
     end
 end
